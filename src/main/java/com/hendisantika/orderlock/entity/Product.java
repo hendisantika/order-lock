@@ -26,10 +26,10 @@ public class Product {
 
     private String name;
 
-    private Long upc;
+    private Long stock;
 
     public Product(String name, Long upc) {
         this.name = name;
-        this.upc = upc;
+        this.stock = upc;
     }
 }
