@@ -6,6 +6,8 @@ Situations which must to be handled
 1. Susan and Manda is ordering apple concurrently
 2. Apple stock = 5, How do you serve Susan and Manda order?
 
+![Sequence Diagram](img/sequence.png "Sequence Diagram")
+
 #### Things to do to run this project:
 1. Clone this repo : `git clone https://github.com/hendisantika/order-lock.git`
 2. Go to the folder it self : `cd order-lock`
