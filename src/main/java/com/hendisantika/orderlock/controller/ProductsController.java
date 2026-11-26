@@ -2,6 +2,7 @@ package com.hendisantika.orderlock.controller;
 
 import com.hendisantika.orderlock.entity.Product;
 import com.hendisantika.orderlock.repository.ProductsRepository;
+import com.hendisantika.orderlock.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +24,9 @@ public class ProductsController {
     @Autowired
     private ProductsRepository repo;
 
+    @Autowired
+    private OrderService orderService;
+
 
     @GetMapping
     public Iterable<Product> findAll() {
@@ -37,6 +41,15 @@ public class ProductsController {
     @PutMapping
     public Product save(@RequestBody Product product) {
         return repo.save(product);
+    }
+
+    /**
+     * Pessimistic locking example: order {@code quantity} items of a product.
+     * Concurrent orders for the same product wait for each other instead of failing.
+     */
+    @PostMapping("/{id}/order")
+    public Product order(@PathVariable Long id, @RequestParam(defaultValue = "1") Long quantity) {
+        return orderService.order(id, quantity);
     }
 
 }

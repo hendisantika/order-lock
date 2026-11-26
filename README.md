@@ -5,7 +5,8 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.2.0-6DB33F?logo=springboot)
 ![Maven](https://img.shields.io/badge/Maven-3.9.11-C71A36?logo=apachemaven)
 
-Demo of handling concurrent orders with **JPA optimistic locking** (`@Version`) in Spring Boot.
+Demo of handling concurrent orders with **JPA optimistic locking** (`@Version`) and **pessimistic locking**
+(`SELECT ... FOR UPDATE`) in Spring Boot.
 
 ### Use Case
 1. (Selecting) As a customer I can select item which I want, if stock is available
@@ -82,6 +83,16 @@ expensive or unacceptable, for example a flash sale where thousands of users buy
 ticket booking, or decrementing an account balance. In that case keep the transaction as short as possible
 and set a lock timeout (`jakarta.persistence.lock.timeout`).
 
+#### Pessimistic locking example in this project
+- `ProductsRepository#findByIdForUpdate` uses `@Lock(LockModeType.PESSIMISTIC_WRITE)` with a 3 second lock timeout.
+- `OrderService#order` runs in one `@Transactional` method: lock the row, check the stock, decrement it.
+  The lock is released on commit, so concurrent orders for the same product are served one by one.
+- Endpoint: `POST /products/{id}/order?quantity=1` returns `200` with the updated product,
+  `409 Conflict` when the stock is not enough, `404` when the product does not exist and `400` when
+  `quantity <= 0`.
+- `OrderServicePessimisticLockTest` fires 10 concurrent orders at a product with stock 5:
+  exactly 5 succeed, 5 get out of stock and the final stock is `0` (never negative).
+
 > Tip: with optimistic locking, handle the exception gracefully, e.g. return `409 Conflict` to the
 > client or retry automatically (Spring Retry `@Retryable`) for a few attempts.
 
@@ -136,12 +147,32 @@ and set a lock timeout (`jakarta.persistence.lock.timeout`).
    User B (Manda) saves first and the version goes from `1` to `2`. User A (Susan) still holds version `1`,
    so her update is rejected by optimistic locking instead of silently overwriting Manda's order.
 
+7. Run the pessimistic locking script: `python3 test-order-pessimistic.py`
+
+    ```
+    Before: {'id': 2, 'name': 'Orange', 'stock': 4, 'version': 2}
+    Customer 1 order: 409
+    Customer 2 order: 409
+    Customer 3 order: 200
+    Customer 4 order: 200
+    Customer 5 order: 409
+    Customer 6 order: 200
+    Customer 7 order: 200
+    Customer 8 order: 409
+    After: {'id': 2, 'name': 'Orange', 'stock': 0, 'version': 6}
+    ```
+
+   8 customers order 1 Orange (stock 4) at the same time. The row is locked with `SELECT ... FOR UPDATE`,
+   so the orders wait for each other: exactly 4 succeed, the other 4 get `409 Conflict` (out of stock)
+   and the stock never goes below `0`. Which customers win depends on timing.
+
 ### API Endpoints
 | Method | Path             | Description                              |
 |--------|------------------|------------------------------------------|
 | GET    | `/products`      | List all products                        |
 | GET    | `/products/{id}` | Get a product by id                      |
 | PUT    | `/products`      | Update a product (must send `version`)   |
+| POST   | `/products/{id}/order?quantity=1` | Order a product (pessimistic locking) |
 
 Example with curl:
 ```shell
@@ -149,6 +180,7 @@ curl http://localhost:8080/products/1
 curl -X PUT -H 'Content-Type: application/json' \
   -d '{"id":1,"name":"Apple","stock":4,"version":1}' \
   http://localhost:8080/products
+curl -X POST "http://localhost:8080/products/1/order?quantity=2"
 ```
 
 ### H2 Console
