@@ -1,63 +1,100 @@
 # order-lock
+
+[![Java CI with Maven](https://github.com/hendisantika/order-lock/actions/workflows/maven.yml/badge.svg)](https://github.com/hendisantika/order-lock/actions/workflows/maven.yml)
+![Java](https://img.shields.io/badge/Java-25-orange?logo=openjdk)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.2.0-6DB33F?logo=springboot)
+![Maven](https://img.shields.io/badge/Maven-3.9.11-C71A36?logo=apachemaven)
+
+Demo of handling concurrent orders with **JPA optimistic locking** (`@Version`) in Spring Boot.
+
 ### Use Case
 1. (Selecting) As a customer I can select item which I want, if stock is available
-2. (Ordering) As a customer I can order items which I’ve already selected is stock available
-Situations which must to be handled
-1. Susan and Manda is ordering apple concurrently
-2. Apple stock = 5, How do you serve Susan and Manda order?
+2. (Ordering) As a customer I can order items which I've already selected if stock is available
+
+Situations which must be handled
+1. Susan and Manda are ordering apple concurrently
+2. Apple stock = 5, how do you serve Susan and Manda's orders?
 
 ![Sequence Diagram](img/sequence.png "Sequence Diagram")
 
-#### Things to do to run this project:
-1. Clone this repo : `git clone https://github.com/hendisantika/order-lock.git`
-2. Go to the folder it self : `cd order-lock`
-3. Make sure you have installed python on your environment.
-4. Make sure you have installed maven on your environment.
-5. If you don't have maven you can run by this command: `./mvnw clean spring-boot:run`
-    ```java
+### How it works
+The `Product` entity has a `version` column annotated with `@Version`. Every update runs
+`UPDATE ... SET version = version + 1 WHERE id = ? AND version = ?`.
+When two customers read the same version and both try to save, the first save wins and bumps the
+version; the second save matches zero rows and Hibernate throws an
+`ObjectOptimisticLockingFailureException`, so stale data never overwrites a newer stock value.
+
+### Tech Stack
+| Component    | Version           |
+|--------------|-------------------|
+| Java         | 25                |
+| Spring Boot  | 4.2.0             |
+| Maven        | 3.9.11 (wrapper)  |
+| Database     | H2 (in-memory)    |
+| Others       | Spring Data JPA, Lombok |
+
+### Prerequisites
+- JDK 25
+- Python 3 + [`requests`](https://pypi.org/project/requests/) (`pip install requests`) to run the test script
+- Maven is optional, the project ships with the Maven Wrapper (`./mvnw`)
+
+### Things to do to run this project
+1. Clone this repo: `git clone https://github.com/hendisantika/order-lock.git`
+2. Go to the folder itself: `cd order-lock`
+3. Build & run the tests: `./mvnw clean verify`
+4. Run the app: `./mvnw spring-boot:run`
+
+    ```
       .   ____          _            __ _ _
      /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
     ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
      \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
       '  |____| .__|_| |_|_| |_\__, | / / / /
      =========|_|==============|___/=/_/_/_/
-     :: Spring Boot ::        (v2.1.2.RELEASE)
-    
-    2019-01-23 06:19:00.275  INFO 29760 --- [           main] c.h.orderlock.OrderLockApplication       : Starting OrderLockApplication on Hendis-MacBook-Pro.local with PID 29760 (/Users/hendisantika/IdeaProjects/order-lock/target/classes started by hendisantika in /Users/hendisantika/IdeaProjects/order-lock)
-    2019-01-23 06:19:00.277  INFO 29760 --- [           main] c.h.orderlock.OrderLockApplication       : No active profile set, falling back to default profiles: default
-    2019-01-23 06:19:00.868  INFO 29760 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data repositories in DEFAULT mode.
-    2019-01-23 06:19:00.936  INFO 29760 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 58ms. Found 1 repository interfaces.
-    2019-01-23 06:19:01.292  INFO 29760 --- [           main] trationDelegate$BeanPostProcessorChecker : Bean 'org.springframework.transaction.annotation.ProxyTransactionManagementConfiguration' of type [org.springframework.transaction.annotation.ProxyTransactionManagementConfiguration$$EnhancerBySpringCGLIB$$71ccfa48] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying)
-    2019-01-23 06:19:01.684  INFO 29760 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port(s): 8080 (http)
-    2019-01-23 06:19:01.718  INFO 29760 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
-    2019-01-23 06:19:01.718  INFO 29760 --- [           main] org.apache.catalina.core.StandardEngine  : Starting Servlet engine: [Apache Tomcat/9.0.14]
-    2019-01-23 06:19:01.735  INFO 29760 --- [           main] o.a.catalina.core.AprLifecycleListener   : The APR based Apache Tomcat Native library which allows optimal performance in production environments was not found on the java.library.path: [/Users/hendisantika/Library/Java/Extensions:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java:.]
-    2019-01-23 06:19:01.838  INFO 29760 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
-    2019-01-23 06:19:01.900  INFO 29760 --- [           main] o.s.boot.web.servlet.RegistrationBean    : Servlet webServlet was not registered (possibly already registered?)
-    2019-01-23 06:19:02.068  INFO 29760 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
-    2019-01-23 06:19:02.282  INFO 29760 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
-    Hibernate: drop table product if exists
-    Hibernate: drop sequence if exists hibernate_sequence
-    Hibernate: create sequence hibernate_sequence start with 1 increment by 1
-    Hibernate: create table product (id bigint not null, name varchar(255), stock bigint, version bigint, primary key (id))
-    2019-01-23 06:19:03.871  INFO 29760 --- [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
-    2019-01-23 06:19:04.365  INFO 29760 --- [           main] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
-    2019-01-23 06:19:04.435  WARN 29760 --- [           main] aWebConfiguration$JpaWebMvcConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
-    2019-01-23 06:19:04.683  INFO 29760 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8080 (http) with context path ''
-    2019-01-23 06:19:04.686  INFO 29760 --- [           main] c.h.orderlock.OrderLockApplication       : Started OrderLockApplication in 5.101 seconds (JVM running for 10.866)
-    2019-01-23 06:19:21.467  INFO 29760 --- [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+
+     :: Spring Boot ::                (v4.2.0)
+
+    ... Starting OrderLockApplication using Java 25 ...
+    ... Tomcat started on port 8080 (http) with context path '/'
+    ... Started OrderLockApplication in 1.576 seconds
     ```
 
-6. Open new terminal to test the app.
-7. In your new terminal run this script : `python test-order.py`
-```python
-User A get: {u'stock': 3, u'version': 7, u'id': 1, u'name': u'Apple'}
-User B get: {u'stock': 3, u'version': 7, u'id': 1, u'name': u'Apple'}
-User B save: {u'stock': 4, u'version': 8, u'id': 1, u'name': u'Apple'}
-User A save: {u'status': 500, u'timestamp': u'2019-01-22T23:20:38.297+0000', u'message': u'Object of class [com.hendisantika.orderlock.entity.Product] with identifier [1]: optimistic locking failed; nested exception is org.hibernate.StaleObjectStateException: Row was updated or deleted by another transaction (or unsaved-value mapping was incorrect) : [com.hendisantika.orderlock.entity.Product#1]', u'path': u'/products', u'error': u'Internal Server Error'}
+   > Port 8080 already in use? Run `./mvnw spring-boot:run -Dspring-boot.run.arguments=--server.port=18080`
+   > and call the script with `BASE_URL=http://localhost:18080`.
+
+5. Open a new terminal to test the app.
+6. Run the script: `python3 test-order.py`
+
+    ```
+    User A get: {'id': 1, 'name': 'Apple', 'stock': 5, 'version': 1}
+    User B get: {'id': 1, 'name': 'Apple', 'stock': 5, 'version': 1}
+    User B save: 200 {'id': 1, 'name': 'Apple', 'stock': 4, 'version': 2}
+    User A save: 500 {'timestamp': '...', 'status': 500, 'error': 'Internal Server Error', 'path': '/products'}
+    ```
+
+   User B (Manda) saves first and the version goes from `1` to `2`. User A (Susan) still holds version `1`,
+   so her update is rejected by optimistic locking instead of silently overwriting Manda's order.
+
+### API Endpoints
+| Method | Path             | Description                              |
+|--------|------------------|------------------------------------------|
+| GET    | `/products`      | List all products                        |
+| GET    | `/products/{id}` | Get a product by id                      |
+| PUT    | `/products`      | Update a product (must send `version`)   |
+
+Example with curl:
+```shell
+curl http://localhost:8080/products/1
+curl -X PUT -H 'Content-Type: application/json' \
+  -d '{"id":1,"name":"Apple","stock":4,"version":1}' \
+  http://localhost:8080/products
 ```
 
+### H2 Console
+Open http://localhost:8080/h2-console with JDBC URL `jdbc:h2:mem:order-lock`, username `sa` and an empty password.
 
-
-
-
+### CI & Dependency Updates
+- **GitHub Actions** builds and tests the project on JDK 25 (Temurin) for every push and pull request to `master`,
+  then submits the Maven dependency graph to GitHub.
+- **Dependabot** checks Maven dependencies daily and GitHub Actions weekly. Spring Boot updates, other
+  minor/patch Maven updates and GitHub Actions updates are grouped into single pull requests.
