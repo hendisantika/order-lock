@@ -1,6 +1,6 @@
 package com.hendisantika.orderlock.config;
 
-import org.h2.server.web.WebServlet;
+import org.h2.server.web.JakartaWebServlet;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,8 +18,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class WebConfig {
     @Bean
-    ServletRegistrationBean h2servletRegistration() {
-        ServletRegistrationBean registrationBean = new ServletRegistrationBean(new WebServlet());
+    ServletRegistrationBean<JakartaWebServlet> h2servletRegistration() {
+        ServletRegistrationBean<JakartaWebServlet> registrationBean = new ServletRegistrationBean<>(new JakartaWebServlet());
         registrationBean.addUrlMappings("/h2-console/*");
         return registrationBean;
     }
