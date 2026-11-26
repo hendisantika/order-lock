@@ -24,6 +24,67 @@ When two customers read the same version and both try to save, the first save wi
 version; the second save matches zero rows and Hibernate throws an
 `ObjectOptimisticLockingFailureException`, so stale data never overwrites a newer stock value.
 
+### Pessimistic vs Optimistic Locking
+Both strategies prevent the **lost update** problem (two transactions read the same row, both modify it,
+and the last write silently overwrites the first). They differ in *when* the conflict is handled.
+
+#### Pessimistic Locking
+"Assume a conflict **will** happen, so lock first."
+
+- The row is locked in the database when it is read (`SELECT ... FOR UPDATE`).
+- Other transactions that want the same row must **wait** until the lock is released (commit/rollback).
+- In Spring Data JPA:
+
+    ```java
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Product p WHERE p.id = :id")
+    Optional<Product> findByIdForUpdate(@Param("id") Long id);
+    ```
+
+- ✅ No conflict errors, the update always succeeds once the lock is obtained.
+- ❌ Lower throughput: transactions queue up, locks are held for the whole transaction.
+- ❌ Risk of deadlocks and lock timeouts; needs an open transaction (cannot span an HTTP request / user think time).
+
+#### Optimistic Locking
+"Assume a conflict **rarely** happens, so check at write time." (used in this project)
+
+- No database lock when reading. Each row carries a `version` column (`@Version`).
+- On update, the version is checked: `UPDATE ... WHERE id = ? AND version = ?`.
+- If another transaction already changed the row, zero rows are updated and an
+  `OptimisticLockException` / `ObjectOptimisticLockingFailureException` is thrown. The application then
+  retries or tells the user that the data has changed.
+- ✅ High throughput, no waiting, no deadlocks.
+- ✅ Works across requests (the client sends back the `version` it read), ideal for REST APIs.
+- ❌ Under heavy contention many requests fail and must be retried.
+
+#### Comparison
+| Aspect                 | Pessimistic Locking                      | Optimistic Locking                         |
+|------------------------|------------------------------------------|--------------------------------------------|
+| When conflict handled  | Before the update (lock on read)         | At commit time (version check)             |
+| Mechanism              | `SELECT ... FOR UPDATE` (DB row lock)    | `@Version` column                          |
+| Concurrent readers     | Blocked / waiting                        | Not blocked                                |
+| On conflict            | Waits for the lock                       | Exception, then retry or reject            |
+| Deadlock risk          | Yes                                      | No                                         |
+| Scalability            | Lower                                    | Higher                                     |
+| Spans multiple requests| No                                       | Yes                                        |
+| Best for               | High contention, short critical sections | Low–medium contention, read-heavy systems  |
+
+#### Which one is recommended?
+**Optimistic locking is the recommended default**, and it is what this project uses, because:
+
+1. Most of the time customers do not update exactly the same row at exactly the same moment, so
+   conflicts are rare and paying the cost of locks on every read is wasteful.
+2. It scales better and has no deadlock risk.
+3. It fits stateless REST APIs: the `version` travels with the data between `GET` and `PUT`.
+
+Use **pessimistic locking** instead when contention on the same row is **high** and retrying is
+expensive or unacceptable, for example a flash sale where thousands of users buy the same item, seat or
+ticket booking, or decrementing an account balance. In that case keep the transaction as short as possible
+and set a lock timeout (`jakarta.persistence.lock.timeout`).
+
+> Tip: with optimistic locking, handle the exception gracefully, e.g. return `409 Conflict` to the
+> client or retry automatically (Spring Retry `@Retryable`) for a few attempts.
+
 ### Tech Stack
 | Component    | Version           |
 |--------------|-------------------|
